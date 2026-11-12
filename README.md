@@ -18,6 +18,8 @@ AI_Security_Research/
 └── part5/      → LinkedIn post images
 ```
 
+each part is the job of 1 person.
+
 ---
 
 ## Part 1 — Data Gathering
@@ -42,19 +44,18 @@ advisories) and stores it in a SQLite database.
 
 **Directory:** `part1&2/` (shared with Part 1)
 
-Trims the raw dataset down to the CVEs that are actually in scope: CVEs that
-have CVSS / SSVC metrics and belong to the analyzed products. CVEs that lack
-the required metric data or fall outside the project scope are removed.
+Removes corrupted and unnecessary data from the raw dump, leaving only the
+entries that are actually usable for the analysis.
 
 **Key files:**
-- `remove_without_metrics_cves.py` — drops CVEs with no metric data
-- `find_without_metric_cves.py` — diagnostic listing of metric-less CVEs
-- `cleanup_scope.py` — removes CVEs outside the analyzed CPE scope
-- `audit_scope.py` — sanity check on scope filtering
+- `remove_without_metrics_cves.py` — drops unusable CVE entries
+- `find_without_metric_cves.py` — diagnostic listing of problematic entries
+- `cleanup_scope.py` — removes corrupted / out-of-scope entries
+- `audit_scope.py` — sanity check on the cleaning step
 - `build_cve_products.py`, `build_products.py`, `build_flat.py` — build the flat analysis views (`cves_flat`, `cve_products`)
 - `nvd_cve.db` — final cleaned database used by later parts
 
-**Output:** `nvd_cve.db` with 859 in-scope CVEs (down from 882 in the raw snapshot — 23 dropped).
+**Output:** `nvd_cve.db` containing **825 CVEs** after removing corrupted and unnecessary data.
 
 ---
 
@@ -66,14 +67,12 @@ Reads the cleaned DB and produces the analysis artifacts used for the write-up.
 
 **Key files:**
 - `analyze_rq6.py` — runs the RQ6 analysis and produces the chart
-- `genai_cves_cvss31.csv` — flat analysis export (CVSS 3.1 / CIA / EPSS per CVE, 894 rows)
+- `genai_cves_cvss31.csv` — flat analysis export (CVSS 3.1 / CIA / EPSS per CVE)
 - `rq6_cia_stacked_bar (2).png` — the RQ6 stacked-bar chart (CIA impact distribution across the 7 main groups)
 
 **What it does:**
-1. Loads `cves_flat` from the cleaned DB
-2. Filters rows without a CIA confidentiality rating
-3. Keeps only the 7 main analyzed groups (Langflow, Open WebUI, Flowise, vLLM, LangChain, Ollama, AutoGPT)
-4. Builds the stacked-bar chart of C / I / A impact distribution
+1. Loads the cleaned dataset
+2. Builds the stacked-bar chart of C / I / A impact distribution across the 7 main analyzed groups (Langflow, Open WebUI, Flowise, vLLM, LangChain, Ollama, AutoGPT)
 
 **Output:** a CSV and a PNG ready to be embedded in the report / LinkedIn post.
 
@@ -109,9 +108,9 @@ the Part 4 post text on LinkedIn.
 ```
 Part 1: fetch CVEs
     ↓
-Part 2: filter out CVEs with no metrics / out of scope
+Part 2: remove corrupted and unnecessary data
     ↓
-Part 3: flatten + filter + chart (RQ6 CIA stacked bar)
+Part 3: analyze and chart (RQ6 CIA stacked bar)
     ↓
 Part 4: write the LinkedIn post (EN + FA)
     ↓
@@ -120,18 +119,7 @@ Part 5: build the LinkedIn post images
 
 ---
 
-## Data Reduction Summary
+## Data Summary
 
-Across the pipeline, the dataset shrinks at each filtering step:
-
-| Stage                                   | Unit        | Start |     End |         Dropped |
-|-----------------------------------------|-------------|------:|--------:|----------------:|
-| Part 1 & 2 — metric/scope filter        | CVEs        |   882 |     859 |         **−23** |
-| Part 2 — flatten (`cves` → `cves_flat`) | CVEs → rows |   859 |     894 | 0 (fan-out +35) |
-| Part 3 — CIA filter (drop C-null)       | flat rows   |   894 |     858 |         **−36** |
-| Part 3 — group filter (keep 7 groups)   | flat rows   |   858 |     817 |         **−41** |
-| **Final plotted dataset**               | flat rows   |     — | **817** |                 |
-
-- **CVEs lost from the pipeline:** 23
-- **Flat rows excluded from the final chart:** 77
-- **Total rows removed:** 100
+After removing corrupted and unnecessary data, the final cleaned dataset used
+for analysis contains **825 CVEs**.
