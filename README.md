@@ -126,8 +126,10 @@ for analysis contains **825 CVEs**.
 
 
 ## Contributors
+'''
 part 1 : Kiarash Daneshvar
 part 2 : Hosein Lavaei
 part 3 : Parsa Rafiei
 part 4 : Farhad Tashi
 part 5 : Setayesh Eskandari
+'''
