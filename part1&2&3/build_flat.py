@@ -133,11 +133,11 @@ def build(conn):
                {expr_ai} AS A,
                ROW_NUMBER() OVER (
                    PARTITION BY cve_id
-                   ORDER BY {kind_rank_sql},
-                            CASE WHEN lower(type)   ='primary'    THEN 0 ELSE 1 END,
+                   ORDER BY CASE WHEN lower(type)   ='primary'    THEN 0 ELSE 1 END,
                             CASE WHEN lower(source) LIKE '%nist%' THEN 0 ELSE 1 END
                ) AS rn
         FROM cvss_metrics
+        WHERE metric_kind = 'cvssMetricV31'
     ),
     cvss_best AS (SELECT * FROM cvss_pick WHERE rn = 1),
     cwe_ranked AS (
@@ -161,10 +161,10 @@ def build(conn):
         FROM cve_products
         GROUP BY cve_id, product
     )
-    SELECT
+   SELECT
         c.id                AS cve_id,
         cp.product          AS product,
-        p.group_name        AS group_name,
+        p.group_name        AS "group",
         c.published         AS published,
         cwe.cwe             AS cwe,
         cv.metric_kind      AS cvss_version,
@@ -186,7 +186,11 @@ def build(conn):
             WHEN ev.has_desc        = 1 THEN 'description_match'
             WHEN ev.has_source_file = 1 THEN 'unverified'
             ELSE 'unverified'
-        END                 AS validation_status
+        END                 AS validation_status,
+        CASE
+            WHEN cv.C IS NULL THEN 'missing_cvss_v31'
+            ELSE ''
+        END                 AS Missing
     FROM cves c
     JOIN (SELECT DISTINCT cve_id, product FROM cve_products) cp
                                      ON cp.cve_id = c.id
@@ -205,7 +209,7 @@ def build(conn):
     for idx, col in [
         ("idx_flat_cve",  "cve_id"),
         ("idx_flat_prod", "product"),
-        ("idx_flat_grp",  "group_name"),
+        ("idx_flat_grp",  '"group"'),
         ("idx_flat_epss", "epss"),
     ]:
         cur.execute(f"CREATE INDEX IF NOT EXISTS {idx} ON cves_flat({col})")
@@ -226,7 +230,7 @@ def report(conn):
     cols = [r[1] for r in cur.execute("PRAGMA table_info(cves_flat)")]
     for col in cols:
         n = cur.execute(
-            f"SELECT COUNT(*) FROM cves_flat WHERE {col} IS NULL OR {col}=''"
+            f'SELECT COUNT(*) FROM cves_flat WHERE "{col}" IS NULL OR "{col}"=\'\''
         ).fetchone()[0]
         flag = " !!" if (n > 0 and col in (
             "cve_id", "product", "group_name", "published",
@@ -271,7 +275,7 @@ def report(conn):
 
     print("\nsample rows (3 highest EPSS):")
     for row in cur.execute("""
-        SELECT cve_id, product, group_name, cvss_score, severity,
+        SELECT cve_id, product, "group", cvss_score, severity,
                epss, validation_status, cwe
         FROM cves_flat
         ORDER BY epss DESC LIMIT 3
